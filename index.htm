@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Arduboy Image Converter</title>
+	<meta http-equiv="Content-type" content="text/html;charset=UTF-8" />
+	<meta name="viewport" content="width=750" />
+	<meta name="buildDate" content="Friday 3 March 2017" />
+	<meta property="og:url" content="https://teamarg.github.io/arduboy-image-converter/" />
+	<meta property="og:type" content="website" /> 
+	<link rel="stylesheet" type="text/css" href="css/textstyles.css" />
+	<script type="text/javascript" src="js/imageCode.js">
+	</script>
+	<link rel="stylesheet" type="text/css" href="css/pagestyle.css?3.568126e+9" />
+	<style type="text/css">
+	div.container {min-height: 1070px;}.shape_18 {background: url('images/shape_18.png') no-repeat;}@media only screen and (-moz-min-device-pixel-ratio: 1.5), only screen and (-o-min-device-pixel-ratio: 3/2), only screen and (-webkit-min-device-pixel-ratio: 1.5), only screen and (min-devicepixel-ratio: 1.5), only screen and (min-resolution: 1.5dppx) {.shape_18 {background: url('images/shape_18@2x.png') no-repeat;background-size: 702px 162px;}}
+	canvas,
+	img {
+		image-rendering: crisp-edges;
+		image-rendering: -moz-crisp-edges;
+		image-rendering: -webkit-optimize-contrast;
+		image-rendering: optimize-contrast;
+		image-rendering: pixelated;
+		-ms-interpolation-mode: nearest-neighbor;
+	}
+	textarea{
+		resize:none;
+		padding:0px;
+		background-color: #FEFEFC;
+		border: 1px solid #463C3C;
+		white-space: pre;
+	}
+	</style>
+	<script language="JavaScript">
+	function setup(body){
+		body.ondragover = function() {
+			return false;
+		};
+		body.ondragend = function() {
+			return false;
+		};
+		body.ondrop = function(e) {
+		        // Prevent the browser from showing the dropped file
+		        e.preventDefault();
+		        // Get the image data
+		        var imageData = getImageData(e);
+		        
+		        // If there is some data, add it to the page
+		        if(imageData !== null) {
+		        	addDroppedElement(imageData);
+		        }
+		    }
+		}
+		function getImageData(event) {
+			var file = event.dataTransfer.files[0];
+			if(file.type.indexOf('image') === 0){
+				return file;
+			}
+		}
+		function addDroppedElement(imageData) {
+			var reader = new FileReader();
+			reader.onload = function(event) {
+				event.preventDefault;
+
+		        // Create image element
+		        var droppedImage = new Image();
+		        droppedImage.src = event.target.result;
+		        // add delay so the image can be loaded properly before accessing it
+		        setTimeout(function(){
+		        	// Create canvas for image
+		        	var droppedImageCanvas = document.createElement("canvas");
+		        	droppedImageCanvas.width = droppedImage.naturalWidth;
+		        	droppedImageCanvas.height = droppedImage.naturalHeight;
+		        	
+		        	// Create code container
+		        	var droppedImageCode = document.createElement("textarea");
+		        	droppedImageCode.className = "code";
+
+		        	droppedImageCode.style.width = "698px";
+		        	droppedImageCode.rows = "20";
+		        	
+		        	// Create div container
+		        	var droppedImageDiv = document.createElement("div");
+		        	droppedImageDiv.className = "image-view";
+		        	droppedImageDiv.appendChild(droppedImageCanvas);
+		        	
+		        	var imageContainer = document.getElementById("image-container");
+		        	imageContainer.innerHTML = "";
+		        	imageContainer.appendChild(droppedImageDiv);
+		        	imageContainer.appendChild(document.createElement("br"));
+		        	imageContainer.appendChild(droppedImageCode);
+		        	
+		        	// Create context for drawing
+		        	var droppedImageContext = droppedImageCanvas.getContext("2d");
+		        	
+		        	// Draw the image
+		        	droppedImageContext.drawImage(droppedImage, 0, 0);
+
+		        	// Generate the sprite string
+		        	var spriteString = "const unsigned char PROGMEM "+imageData.name.split(/_|\./)[0]+"[] =\n"+
+		        	"{\n// width, height,\n"+droppedImage.naturalWidth+", "+droppedImage.naturalHeight+",\n";
+		        	
+		        	var pageCount = Math.ceil(droppedImage.naturalHeight / 8);
+		        	var columnCount = droppedImage.naturalWidth;
+		        	var currentByte = 0;
+		        	
+		        	// Read the sprite page-by-page
+		        	for(var page = 0; page < pageCount; page++) {
+
+		        	    // Read the page column-by-column
+		        	    for(var column = 0; column < columnCount; column++) {
+
+		        	        // Read the column into a byte
+		        	        var spriteByte = 0;
+		        	        for(var yPixel = 0; yPixel < 8; yPixel++) {
+
+		        	            // If the color of the pixel is not black, count it as white
+		        	            var pixelColor = droppedImageContext.getImageData(column, page*8 + yPixel, 1, 1).data;
+		        	            if(pixelColor[0] > 0 || pixelColor[1] > 0 || pixelColor[2] > 0) {
+		        	            	spriteByte |= (1 << yPixel);
+		        	            }
+		        	        }
+		        	        
+		        	        // Print the column in hex notation, add a comma for formatting
+		        	        var digitStr = spriteByte.toString(16);
+		        	        if(digitStr.length == 1) {
+		        	        	digitStr = "0" + digitStr;
+		        	        }
+		        	        spriteString += "0x" + digitStr + ", ";
+		        	        if(currentByte%droppedImage.naturalWidth == droppedImage.naturalWidth - 1) {
+		        	        	spriteString += "\n";
+		        	        }
+		        	        currentByte++;
+		        	    }
+		        	}
+		        	// Terminate the array
+		        	spriteString += "};";
+		        	// Create an invisible element containing the string
+		        	droppedImageCode.innerHTML = spriteString;
+		        	
+		        	// Resize canvas to show 2x scaled image
+		        	droppedImageCanvas.width = droppedImage.naturalWidth * 2;
+		        	droppedImageCanvas.height = droppedImage.naturalHeight * 2;
+		        	droppedImageContext = droppedImageCanvas.getContext("2d");
+		        	droppedImageContext.imageSmoothingEnabled = false;
+		        	droppedImageContext.drawImage(droppedImage, 0, 0, droppedImage.naturalWidth * 2, droppedImage.naturalHeight * 2);
+		        }, 50);
+};
+reader.readAsDataURL(imageData);
+}
+</script>
+</head>
+
+<body onload="setup(this);" style="font-family: Courier New; text-align: center;">
+	<div class="shadow">
+		<div class="container" style="height:1070px">
+
+			<header>
+				<div style="position:relative">
+					<div class="shape_0" style="left:25px;top:-1px;width:700px;height:64px;z-index:0;position:absolute;">
+						<img src="images/tittle.gif" height="64" width="700" />
+					</div>
+				</div>
+				<div style="position:relative">
+					<a href="http://www.team-arg.org/index.html">
+						<div class="shape_1" style="left:25px;top:63px;width:88px;height:28px;z-index:1;position:absolute;">
+							<img src="images/home.gif" height="28" width="88" />
+						</div>
+					</a>
+				</div>
+				<div style="position:relative">
+					<a href="http://www.team-arg.org/more-about.html">
+						<div class="shape_2" style="left:637px;top:63px;width:88px;height:28px;z-index:2;position:absolute;">
+							<img src="images/more.gif" height="28" width="88" />
+						</div>
+					</a>
+				</div>
+				<div style="position:relative">
+					<a href="http://www.team-arg.org/news.html">
+						<div class="shape_3" style="left:141px;top:63px;width:88px;height:28px;z-index:3;position:absolute;">
+							<img src="images/news.gif" height="28" width="88" />
+						</div>
+					</a>
+				</div>
+				<div style="position:relative">
+					<a href="http://www.team-arg.org/games.html">
+						<div class="shape_4" style="left:251px;top:63px;width:108px;height:28px;z-index:4;position:absolute;">
+							<img src="images/games.gif" height="28" width="108" />
+						</div>
+					</a>
+				</div>
+				<div style="position:relative">
+					<a href="http://www.team-arg.org/demos.html">
+						<div class="shape_5" style="left:381px;top:63px;width:108px;height:28px;z-index:5;position:absolute;">
+							<img src="images/demos.gif" height="28" width="108" />
+						</div>
+					</a>
+				</div>
+				<div style="position:relative">
+					<a href="http://www.team-arg.org/tools.html">
+						<div class="shape_6" style="left:511px;top:63px;width:108px;height:28px;z-index:6;position:absolute;">
+							<img src="images/tools.gif" height="28" width="108" />
+						</div>
+					</a>
+				</div>
+			</header>
+
+
+			<div class="content" data-minheight="900">
+				<div style="position:relative">
+					<div class="shape_13" style="left:25px;top:275px;width:700px;height:5px;z-index:13;position:absolute;">
+						<img src="images/longLine-13.gif" height="5" width="700" />
+					</div>
+				</div>
+				<div style="position:relative">
+					<div class="shape_14" style="left:25px;top:120px;width:700px;height:96px;z-index:14;position:absolute;">
+						<img src="images/ImageConverter.png" height="96" width="700" />
+					</div>
+				</div>
+				<div style="position:relative">
+					<div class="shape_15" style="left:367px;top:235px;width:15px;height:21px;z-index:15;position:absolute;">
+						<img src="images/line.gif" height="21" width="15" />
+					</div>
+				</div>
+				<div style="position:relative">
+					<a href="http://www.team-arg.org/IMGconvert-manual.html" data-linkuuid="86B79DF422AB49529450C8464BC2C7E8">
+						<div class="shape_16" style="left:401px;top:235px;width:96px;height:21px;z-index:16;position:absolute;">
+							<img src="images/manual.gif" height="21" width="96" />
+						</div>
+					</a>
+				</div>
+				<div style="position:relative">
+					<a href="https://teamarg.github.io/arduboy-image-converter/">
+						<div class="shape_17" style="left:283px;top:235px;width:66px;height:21px;z-index:17;position:absolute;">
+							<img src="images/Tool.gif" height="21" width="66" />
+						</div>
+					</a>
+				</div>
+
+
+				<div style="position:relative">
+					<div class="shape_18" style="left:24px;top:329px;width:702px;height:162px;z-index:18;position:absolute;">
+						<div style="margin: 4.32px 2.16px 4.32px 2.16px; ">
+							<p style="line-height:18px;text-align:center;margin-top:0px;margin-bottom:0px;" class="Style2">
+								<br />
+							</p>
+							<p style="line-height:50.4px;text-align:center;margin-bottom:0px;margin-top:0px;" class="Style65">
+								Drop your image file here
+							</p>
+						</div>
+					</div>
+				</div>
+
+				<div style="position:relative">
+					<div class="shape_19" style="left:25px;top:534px;width:700px;height:160px;z-index:17;position:absolute;">
+						<div style="margin: 4.32px 2.16px 4.32px 2.16px; " id='image-container'>
+
+						</div>
+					</div>
+				</div>
+			</div>
+
+
+			<footer data-top='1000' data-height='70'>
+				<div style="position:relative">
+					<a href="http://www.twitter.com/TEAMarg_org">
+						<div class="shape_7" style="left:25px;top:1020px;width:48px;height:48px;z-index:7;position:absolute;">
+							<img src="images/twitter.gif" height="48" width="48" />
+						</div>
+					</a>
+				</div>
+				<div style="position:relative">
+					<a href="https://www.youtube.com/channel/UC5PtrkZ9BaCrLIW8WXe2_XA">
+						<div class="shape_8" style="left:85px;top:1020px;width:48px;height:48px;z-index:8;position:absolute;">
+							<img src="images/youtube.gif" height="48" width="48" />
+						</div>
+					</a>
+				</div>
+				<div style="position:relative">
+					<div class="shape_9" style="left:629px;top:1020px;width:96px;height:48px;z-index:9;position:absolute;">
+						<img src="images/8bit-games.gif" height="48" width="96" />
+					</div>
+				</div>
+				<div style="position:relative">
+					<div class="shape_10" style="left:25px;top:1000px;width:700px;height:5px;z-index:10;position:absolute;">
+						<img src="images/longLine.gif" height="5" width="700" />
+					</div>
+				</div>
+				<div style="position:relative">
+					<a href="https://github.com/TEAMarg">
+						<div class="shape_11" style="left:145px;top:1020px;width:48px;height:48px;z-index:11;position:absolute;">
+							<img src="images/github.gif" height="48" width="48" />
+						</div>
+					</a>
+				</div>
+				<div style="position:relative">
+					<a href="https://www.facebook.com/TEAMArduinoRetroGaming/">
+						<div class="shape_12" style="left:205px;top:1020px;width:48px;height:48px;z-index:12;position:absolute;">
+							<img src="images/facebook.gif" height="48" width="48" />
+						</div>
+					</a>
+				</div>
+			</footer>
+		</div>
+	</div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+div.shadow {
+	background-image: url('../images/background_shadow.png');
+	background-repeat: repeat-y;
+	background-position: 50% 0px;
+	}
+
+a img {
+	border:0px;
+}
+	
+body {
+	background-color: #FEFFFF;
+	margin: 0px auto;
+}
+
+div.container {
+	margin: 0px auto;
+	width: 750px;
+	height: auto;
+	background-color: #FEFEFC;
+}
